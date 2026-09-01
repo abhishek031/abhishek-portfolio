@@ -15,7 +15,7 @@ export default async function handler(req: Request): Promise<Response> {
     return json({ error: "Method not allowed" }, 405);
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return json({ error: "Server is not configured with an API key" }, 500);
   }
@@ -42,34 +42,31 @@ Portfolio data:
 ${buildPortfolioContext()}`;
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
+        model: "llama-3.3-70b-versatile",
         max_tokens: 400,
-        system: systemPrompt,
-        messages: [...history, { role: "user", content: message }],
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...history,
+          { role: "user", content: message },
+        ],
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("Anthropic API error:", errText);
+      console.error("Groq API error:", errText);
       return json({ error: "The assistant is unavailable right now" }, 502);
     }
 
     const data = await response.json();
-    const reply = data.content
-      ?.map((block: { type: string; text?: string }) =>
-        block.type === "text" ? block.text : ""
-      )
-      .join("")
-      .trim();
+    const reply = data.choices?.[0]?.message?.content?.trim();
 
     return json({ reply: reply || "Sorry, I couldn't generate a response." });
   } catch (err) {
